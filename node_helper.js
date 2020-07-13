@@ -135,11 +135,11 @@ var SunnyPortal = function(opts) {
 	};
 
 	var _setFileDate = function(datetype, month, day, year, jar, callback) {				
-
+		const nodeVersion = Number(process.version.match(/^v(\d+\.\d+)/)[1]);
 		var requestOpts = {
 			headers : {
-				// We need to simulate a Browser which the SunnyPortal accepts...here I am Using Firefox 77.0 (64-bit) for Windows
-				'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:77.0) Gecko/20100101 Firefox/77.0',			
+				// We need to simulate a Browser which the SunnyPortal accepts. Here we send the MagicMirror and node.js versions.
+				"User-Agent": "Mozilla/5.0 (Node.js " + nodeVersion + ") MagicMirror/" + global.version + " (https://github.com/MichMich/MagicMirror/)"
 			},
 			form : {
 				__EVENTTARGET : '',
