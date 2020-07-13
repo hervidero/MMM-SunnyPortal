@@ -68,45 +68,47 @@ var SunnyPortal = function(opts) {
 			viewstategenerator = body.match(/<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="(.*)" \/>/)[1];
 			console.log("Fetched VIEWSTATE value: " + viewstate);
 			console.log("Fetched VIEWSTATEGENERATOR value: " + viewstategenerator);
+		});
+		
+		const nodeVersion = Number(process.version.match(/^v(\d+\.\d+)/)[1]);
+		requestOpts = {
+			headers : {
+				// We need to simulate a Browser which the SunnyPortal accepts...here I am Using Firefox 77.0 (64-bit) for Windows
+				//'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:77.0) Gecko/20100101 Firefox/77.0',
+				"User-Agent": "Mozilla/5.0 (Node.js " + nodeVersion + ") MagicMirror/" + global.version + " (https://github.com/MichMich/MagicMirror/)",
+			},
+			form : {
+				__VIEWSTATE : viewstate,
+				__VIEWSTATEGENERATOR : viewstategenerator,
+				ctl00$ContentPlaceHolder1$Logincontrol1$txtUserName : username,
+				ctl00$ContentPlaceHolder1$Logincontrol1$txtPassword : password,
+				ctl00$ContentPlaceHolder1$Logincontrol1$LoginBtn : 'Login',
+			},
+			jar : jar,
+			agentOptions: {
+				rejectUnauthorized: false
+			}
+		};
 
-			requestOpts = {
-				headers : {
-					// We need to simulate a Browser which the SunnyPortal accepts...here I am Using Firefox 77.0 (64-bit) for Windows
-					'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:77.0) Gecko/20100101 Firefox/77.0',
-				},
-				form : {
-					__VIEWSTATE : viewstate,
-					__VIEWSTATEGENERATOR : viewstategenerator,
-					ctl00$ContentPlaceHolder1$Logincontrol1$txtUserName : username,
-					ctl00$ContentPlaceHolder1$Logincontrol1$txtPassword : password,
-					ctl00$ContentPlaceHolder1$Logincontrol1$LoginBtn : 'Login',
-				},
-				jar : jar,
-				agentOptions: {
-					rejectUnauthorized: false
-				}
-			};
+		// Now Let's login by Posting the data
+		request.post(url + LOGIN_URL + "?ReturnURl=%2f", requestOpts, function (err, httpResponse, body) {
+			if (err) {
+				console.error('login failed:', err);
+				callback(err);
+				return ;
+			}
 
-			// Now Let's login by Posting the data
-			request.post(url + LOGIN_URL + "?ReturnURl=%2f", requestOpts, function (err, httpResponse, body) {
-				if (err) {
-					console.error('login failed:', err);
-					callback(err);
-					return ;
-				}
-
-				// Hack to check for login. Should forward to dashboard.
-				if(httpResponse.headers.location && httpResponse.headers.location === DASHBOARD_URL) {
-					console.log("SUCCESSFULLY LOGGED IN TO DASHBOARD");
-					callback(err, jar);
-				} else if(httpResponse.headers.location && httpResponse.headers.location === USERPROFILE_URL) {
-					console.log("SUCCESSFULLY LOGGED IN TO USERPROFILE");
-					callback(err, jar);
-				} else {
-					console.log("Login Failed, no redirect to Dashboard or UserProfile"+ httpResponse.headers.location);
-					callback(new Error('Login Failed, no redirect to Dashboard or UserProfile'));
-				}
-			});
+			// Hack to check for login. Should forward to dashboard.
+			if(httpResponse.headers.location && httpResponse.headers.location === DASHBOARD_URL) {
+				console.log("SUCCESSFULLY LOGGED IN TO DASHBOARD");
+				callback(err, jar);
+			} else if(httpResponse.headers.location && httpResponse.headers.location === USERPROFILE_URL) {
+				console.log("SUCCESSFULLY LOGGED IN TO USERPROFILE");
+				callback(err, jar);
+			} else {
+				console.log("Login Failed, no redirect to Dashboard or UserProfile"+ httpResponse.headers.location);
+				callback(new Error('Login Failed, no redirect to Dashboard or UserProfile'));
+			}
 		});
 	};
 
