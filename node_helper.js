@@ -43,7 +43,7 @@ var SunnyPortal = function(opts) {
 	var password = opts.password;
 	var plantOID = "";
 
-	var _login = function(callback) {
+	var _getViewState = function(callback) {
 		var jar = request.jar(); // create new cookie jar
 		var viewstate = null;
 		var viewstategenerator = null;
@@ -68,7 +68,36 @@ var SunnyPortal = function(opts) {
 			viewstategenerator = body.match(/<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="(.*)" \/>/)[1];
 			console.log("Fetched VIEWSTATE value: " + viewstate);
 			console.log("Fetched VIEWSTATEGENERATOR value: " + viewstategenerator);
-		
+			callback(err, viewstate, viewstategenerator, jar);
+		});	
+	}
+	
+	var _login = function(jar, viewstate, viewstategenerator, callback) {
+		//var jar = request.jar(); // create new cookie jar
+		//var viewstate = null;
+		//var viewstategenerator = null;
+
+/*		var requestOpts = {
+			jar : jar,
+			agentOptions: {
+				rejectUnauthorized: false
+			}
+		};
+
+		// Let's first fetch the VIEWSTATE & VIEWSTATEGENERATOR hidden parameter values
+		request.get(url + LOGIN_URL, requestOpts, function (err, httpResponse, body) {
+			if (err) {
+				console.error('Unable to fetch login page: ', err);
+				callback(err);
+				return ;
+			}
+			console.log("Cookie Value: " + jar.getCookieString(url));
+			// Filter out both values for the VIEWSTATE & VIEWSTATEGENERATOR hidden parameter
+			viewstate = body.match(/<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="(.*)" \/>/)[1];
+			viewstategenerator = body.match(/<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="(.*)" \/>/)[1];
+			console.log("Fetched VIEWSTATE value: " + viewstate);
+			console.log("Fetched VIEWSTATEGENERATOR value: " + viewstategenerator);
+*/		
 			const nodeVersion = Number(process.version.match(/^v(\d+\.\d+)/)[1]);
 			requestOpts = {
 				headers : {
@@ -108,7 +137,7 @@ var SunnyPortal = function(opts) {
 					callback(new Error('Login Failed, no redirect to Dashboard or UserProfile'));
 				}
 			});
-		});	
+//		});	
 	};
 
 	var _openInverter = function(jar, callback) {
@@ -260,7 +289,11 @@ var SunnyPortal = function(opts) {
 		var finalJar;
 		flow.exec(
 			function() {
-				_login(this);
+				_getViewState(this);
+			},
+			function(err, viewstate, viewstategenerator, jar) {
+				finalJar = jar;
+				_login(finalJar, viewstate, viewstategenerator, this);
 			},
 			function(err, jar) {
 				finalJar = jar;
