@@ -22,6 +22,7 @@ Module.register("MMM-SunnyPortal",{
 	  chartcolor2: '#909090',
 	  convertUnits: true,
 	  includeGraphs: ['all'], //Default ['all'] (uses default order) or define an array with 1-4 elements like: ['day', 'month', 'year', 'total']
+	  debug: false,
 	},
 
   

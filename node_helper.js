@@ -41,13 +41,14 @@ var SunnyPortal = function(opts) {
 	var url = opts.url;
 	var username = opts.username;
 	var password = opts.password;
+	var debug = opts.debug;
 	var plantOID = "";
+	
+	var viewstate = null;
+	var viewstategenerator = null;
 
 	var _getViewState = function(callback) {
 		var jar = request.jar(); // create new cookie jar
-		var viewstate = null;
-		var viewstategenerator = null;
-
 		var requestOpts = {
 			jar : jar,
 			agentOptions: {
@@ -62,86 +63,60 @@ var SunnyPortal = function(opts) {
 				callback(err);
 				return ;
 			}
-			console.log("Cookie Value: " + jar.getCookieString(url));
+			if (debug) console.log("Cookie Value: " + jar.getCookieString(url));
 			// Filter out both values for the VIEWSTATE & VIEWSTATEGENERATOR hidden parameter
 			viewstate = body.match(/<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="(.*)" \/>/)[1];
 			viewstategenerator = body.match(/<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="(.*)" \/>/)[1];
-			console.log("Fetched VIEWSTATE value: " + viewstate);
-			console.log("Fetched VIEWSTATEGENERATOR value: " + viewstategenerator);
-			callback(err, viewstate, viewstategenerator, jar);
+			if (debug) console.log("Fetched VIEWSTATE value: " + viewstate);
+			if (debug) console.log("Fetched VIEWSTATEGENERATOR value: " + viewstategenerator);
+			callback(err, jar);
 		});	
 	}
 	
-	var _login = function(jar, viewstate, viewstategenerator, callback) {
-		//var jar = request.jar(); // create new cookie jar
-		//var viewstate = null;
-		//var viewstategenerator = null;
-
-/*		var requestOpts = {
+	var _login = function(jar, callback) {		
+		const nodeVersion = Number(process.version.match(/^v(\d+\.\d+)/)[1]);
+		requestOpts = {
+			headers : {
+				// We need to simulate a Browser which the SunnyPortal accepts. Here we send the MagicMirror and node.js versions.
+				"User-Agent": "Mozilla/5.0 (Node.js " + nodeVersion + ") MagicMirror/" + global.version + " (https://github.com/MichMich/MagicMirror/)"
+			},
+			form : {
+				__VIEWSTATE : viewstate,
+				__VIEWSTATEGENERATOR : viewstategenerator,
+				ctl00$ContentPlaceHolder1$Logincontrol1$txtUserName : username,
+				ctl00$ContentPlaceHolder1$Logincontrol1$txtPassword : password,
+				ctl00$ContentPlaceHolder1$Logincontrol1$LoginBtn : 'Login',
+			},
 			jar : jar,
 			agentOptions: {
 				rejectUnauthorized: false
 			}
 		};
 
-		// Let's first fetch the VIEWSTATE & VIEWSTATEGENERATOR hidden parameter values
-		request.get(url + LOGIN_URL, requestOpts, function (err, httpResponse, body) {
+		// Now Let's login by Posting the data
+		request.post(url + LOGIN_URL + "?ReturnURl=%2f", requestOpts, function (err, httpResponse, body) {
 			if (err) {
-				console.error('Unable to fetch login page: ', err);
+				console.error('login failed:', err);
 				callback(err);
 				return ;
 			}
-			console.log("Cookie Value: " + jar.getCookieString(url));
-			// Filter out both values for the VIEWSTATE & VIEWSTATEGENERATOR hidden parameter
-			viewstate = body.match(/<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="(.*)" \/>/)[1];
-			viewstategenerator = body.match(/<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="(.*)" \/>/)[1];
-			console.log("Fetched VIEWSTATE value: " + viewstate);
-			console.log("Fetched VIEWSTATEGENERATOR value: " + viewstategenerator);
-*/		
-			const nodeVersion = Number(process.version.match(/^v(\d+\.\d+)/)[1]);
-			requestOpts = {
-				headers : {
-					// We need to simulate a Browser which the SunnyPortal accepts. Here we send the MagicMirror and node.js versions.
-					"User-Agent": "Mozilla/5.0 (Node.js " + nodeVersion + ") MagicMirror/" + global.version + " (https://github.com/MichMich/MagicMirror/)"
-				},
-				form : {
-					__VIEWSTATE : viewstate,
-					__VIEWSTATEGENERATOR : viewstategenerator,
-					ctl00$ContentPlaceHolder1$Logincontrol1$txtUserName : username,
-					ctl00$ContentPlaceHolder1$Logincontrol1$txtPassword : password,
-					ctl00$ContentPlaceHolder1$Logincontrol1$LoginBtn : 'Login',
-				},
-				jar : jar,
-				agentOptions: {
-					rejectUnauthorized: false
-				}
-			};
 
-			// Now Let's login by Posting the data
-			request.post(url + LOGIN_URL + "?ReturnURl=%2f", requestOpts, function (err, httpResponse, body) {
-				if (err) {
-					console.error('login failed:', err);
-					callback(err);
-					return ;
-				}
-
-				// Hack to check for login. Should forward to dashboard.
-				if(httpResponse.headers.location && httpResponse.headers.location === DASHBOARD_URL) {
-					console.log("SUCCESSFULLY LOGGED IN TO DASHBOARD");
-					callback(err, jar);
-				} else if(httpResponse.headers.location && httpResponse.headers.location === USERPROFILE_URL) {
-					console.log("SUCCESSFULLY LOGGED IN TO USERPROFILE");
-					callback(err, jar);
-				} else {
-					console.log("Login Failed, no redirect to Dashboard or UserProfile"+ httpResponse.headers.location);
-					callback(new Error('Login Failed, no redirect to Dashboard or UserProfile'));
-				}
-			});
-//		});	
+			// Hack to check for login. Should forward to dashboard.
+			if(httpResponse.headers.location && httpResponse.headers.location === DASHBOARD_URL) {
+				if (debug) console.log("SUCCESSFULLY LOGGED IN TO DASHBOARD");
+				callback(err, jar);
+				return(err, jar);
+			} else if(httpResponse.headers.location && httpResponse.headers.location === USERPROFILE_URL) {
+				if (debug) console.log("SUCCESSFULLY LOGGED IN TO USERPROFILE");
+				callback(err, jar);
+			} else {
+				console.log("Login Failed, no redirect to Dashboard or UserProfile"+ httpResponse.headers.location);
+				callback(new Error('Login Failed, no redirect to Dashboard or UserProfile'));
+			}
+		});
 	};
 
 	var _openInverter = function(jar, callback) {
-
 		var requestOpts = {
 			method : 'GET',
 			jar : jar,
@@ -155,10 +130,10 @@ var SunnyPortal = function(opts) {
 				console.error('Could not open inverter')
 				callback(err);
 			}
-			console.log("HTTP Result: "+ httpResponse.statusCode);
+			if (debug) console.log("HTTP Result: "+ httpResponse.statusCode);
 			// Filter out value for the ctl00_HiddenPlantOID hidden parameter
 			plantOID = body.match(/<input type="hidden" name="ctl00\$HiddenPlantOID" id="ctl00_HiddenPlantOID" value="(.*)" \/>/)[1];
-			console.log("Fetched ctl00_HiddenPlantOID value: " + plantOID);
+			if (debug) console.log("Fetched ctl00_HiddenPlantOID value: " + plantOID);
 			callback(err, body);
 		});
 	};
@@ -200,7 +175,7 @@ var SunnyPortal = function(opts) {
 		// If the datetype is day and the provided date is the current date, we may not post the SET_FILE_DATE_URL
 		var now = new Date();
         if (datetype == 'day' && day == now.getDate() && month == now.getMonth()+1 && year == now.getFullYear()) {
-			console.log ("Skip setting date because we are requesting power data from today");
+			if (debug) console.log ("Skip setting date because we are requesting power data from today");
 			callback();
 		} else {
 			request.post(url + SET_FILE_DATE_URL, requestOpts, function (err, httpResponse, body) {
@@ -209,7 +184,7 @@ var SunnyPortal = function(opts) {
 					callback(err);
 					return ;
 				};
-			console.log("HTTP Result: "+ httpResponse.statusCode);
+			if (debug) console.log("HTTP Result: "+ httpResponse.statusCode);
 			callback(err, body);
 		});
 		}
@@ -231,7 +206,7 @@ var SunnyPortal = function(opts) {
 				callback(err);
 				return ;
             };
-			console.log("HTTP Result: "+ httpResponse.statusCode);
+			if (debug) console.log("HTTP Result: "+ httpResponse.statusCode);
 			callback(err, body);
 		});
 	}
@@ -280,20 +255,22 @@ var SunnyPortal = function(opts) {
 	* @param {Number} year
 	* @param {Function} callback A callback function once historical production is recieved. Will return a JSON object of the days production.
 	*/
-	var historicalProduction = function(datetype, month, day, year, callback) {
+	var historicalProduction = function getHistoricalProduction (datetype, month, day, year, callback) {
 		// Due to app dependencies, you cannot just download the document.  
 		// You need to crawl the application such that items get added to your session.  
 		// Then you may download the days data.
 		//
 		// You could make this more efficient by not logging in everytime but... I just wanted something quick and dirty.
 		var finalJar;
+		var jar;
+		//_getViewState(_login(jar, _openInverter(jar, _setFileDate(datetype, month, day, year, finalJar, _downloadResults(jar, callback())))));
 		flow.exec(
 			function() {
-				_getViewState(this);
+				_getViewState(this)
 			},
-			function(err, viewstate, viewstategenerator, jar) {
+			function(err, jar) {
 				finalJar = jar;
-				_login(finalJar, viewstate, viewstategenerator, this);
+				_login(finalJar, this);
 			},
 			function(err, jar) {
 				finalJar = jar;
@@ -477,7 +454,7 @@ module.exports = NodeHelper.create({
   },
 
   processDayData: function(self) {
-    console.log("Starting function processDayData with data: " + self.dayData);
+    //console.log("Starting function processDayData with data: " + self.dayData);
 
     // Send all to script
     self.sendSocketNotification('SUNNYPORTAL_DAY', {
@@ -486,7 +463,7 @@ module.exports = NodeHelper.create({
   },
 
   processMonthData: function(self) {
-    console.log("Starting function processMonthData with data: " + self.monthData);
+    //console.log("Starting function processMonthData with data: " + self.monthData);
 
     // Send all to script
     self.sendSocketNotification('SUNNYPORTAL_MONTH', {
@@ -495,7 +472,7 @@ module.exports = NodeHelper.create({
   },
 
   processYearData: function(self) {
-    console.log("Starting function processYearData with data: " + self.yearData);
+    //console.log("Starting function processYearData with data: " + self.yearData);
 
     // Send all to script
     self.sendSocketNotification('SUNNYPORTAL_YEAR', {
@@ -504,7 +481,7 @@ module.exports = NodeHelper.create({
   },
 
   processTotalData: function(self) {
-    console.log("Starting function processTotalData with data: " + self.totalData);
+    //console.log("Starting function processTotalData with data: " + self.totalData);
 
     // Send all to script
     self.sendSocketNotification('SUNNYPORTAL_TOTAL', {
